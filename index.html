@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+  	<meta charset="utf-8">
+    <title>Wikipedia Viewer</title>
+    <link rel="stylesheet" href="styles/bootstrap.min.css">
+    <link rel="stylesheet" href="styles/wikiviewer.css">
+  </head>
+  <body ng-app="wikipediaViewerApp" ng-controller="SearchResultsCtrl">
+
+    <h1>Search Wikipedia</h1>
+    <form ng-submit="search(keyword)">
+      <div class="search-bar input-group input-group-lg auto-margin">
+        <span class="input-group-addon"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></span>
+        <input type="text" class="form-control" placeholder="Search" aria-describedby="sizing-addon1" ng-model="keyword">
+      </div> <!-- /.search-bar -->
+      <div class="auto-margin" id="random-search">
+        <button class="btn btn-default" type="button" ng-click="randomArticle()">Show me a random article</button>
+      </div>
+    </form>
+
+    <div id="article" ng-repeat="article in articles">
+      <div class="thumbnail">
+        <div class="caption">
+          <a ng-href="{{article.url}}" target="_blank"><h3>{{article.title}}</h3></a>
+          <p ng-bind-html="article.snippet"></p>
+          <p><a ng-href="{{article.url}}" class="btn btn-primary" role="button" target="_blank">Continue reading...</a></p>
+        </div> <!-- /.caption -->
+      </div> <!-- /.thumbnail -->
+    </div> <!-- /#article -->
+
+    <script src="scripts/angular.min.js"></script>
+    <script src="scripts/wikiviewer.js"></script>
+  </body>
+</html>
