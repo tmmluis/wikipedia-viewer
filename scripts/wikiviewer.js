@@ -1,7 +1,7 @@
 // Wrapping the Javascript in a closure (to avoid collisions with global scope).
 (function () {
   // Creating the AngularJS module.
-  var wikipediaViewerApp = angular.module('wikipediaViewerApp', []);
+  var app = angular.module('wikipediaViewer', []);
 
   /*
   * Creating and registering a controller with our module.
@@ -10,7 +10,8 @@
   * Adding the'$sce' service so we can explicitly trust html returned
   * from Wikipedia and use 'ng-bind-html'.
   */
-  wikipediaViewerApp.controller('SearchResultsCtrl', [ '$scope', '$http', '$sce', function ($scope, $http, $sce) {
+  app.controller('SearchController', [ '$scope', '$http', '$sce', function ($scope, $http, $sce) {
+    // Initialization
     $scope.articles = [];
     $scope.keyword = '';
 
@@ -30,6 +31,8 @@
         + '&format=json&callback=JSON_CALLBACK';
       $scope.searchQueryUrl = query;
 
+      // Perform the JSON request, parse the result, and chain a second
+      // request to get more info about the returned pages.
       $http.jsonp(query)
         .then(function(response){
           return parseSearchByKeyword(response);
