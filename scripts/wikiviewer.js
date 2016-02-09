@@ -10,10 +10,12 @@
   * Adding the'$sce' service so we can explicitly trust html returned
   * from Wikipedia and use 'ng-bind-html'.
   */
-  app.controller('SearchController', [ '$scope', '$http', '$sce', function ($scope, $http, $sce) {
+  app.controller('SearchController', [ '$scope', '$http', '$sce', '$q',
+      function ($scope, $http, $sce, $q) {
     // Initialization
     $scope.articles = [];
     $scope.keyword = '';
+    var ENDPOINT = 'https://en.wikipedia.org/w/api.php?';
 
     // Triggered when 'search' is pressed.
     $scope.search = function(keyword) {
@@ -25,24 +27,20 @@
       * To avoid cross-domain restrictions we'll be using the 'jsonp'
       * method with 'callback=JSON_CALLBACK'.
       */
-      var query = 'https://en.wikipedia.org/w/api.php?'
-        +'action=query&list=search&srsearch='
-        + keyword
-        + '&format=json&callback=JSON_CALLBACK';
-      $scope.searchQueryUrl = query;
+      var query = 'action=query&list=search&srsearch=';
+      var parameters = '&format=json&callback=JSON_CALLBACK';
+
+      var url = ENDPOINT + query + keyword + parameters;
 
       // Perform the JSON request, parse the result, and chain a second
       // request to get more info about the returned pages.
-      $http.jsonp(query)
-        .then(function(response){
-          return parseSearchByKeyword(response);
-      })
-        .then(function(response){
-          parseInfo(response);
+      Wikipedia.search(url).then(function(infoURL) {
+        Wikipedia.getInfo(infoURL).then(function(info) {
+          parseInfo(info);
+        });
       })
         .catch(function(error){
-          $scope.error = "An error has occured!";
-          console.log(error);
+          console.log("There was an error querying Wikipedia: " + error);
       });
     };
 
@@ -50,12 +48,12 @@
       // Reset previous results.
       $scope.articles = [];
 
-      var query = 'https://en.wikipedia.org/w/api.php?'
-        + 'action=query&list=random&rnnamespace=0'
-        + '&format=json&callback=JSON_CALLBACK';
-      $scope.searchQueryUrl = query;
+      var query = 'action=query&list=random&rnnamespace=0';
+      var parameters = '&format=json&callback=JSON_CALLBACK';
 
-      $http.jsonp(query)
+      var url = ENDPOINT + query + parameters;
+
+      $http.jsonp(url)
         .then(function(response){
           var page = response.data.query.random[0];
           var article = {
@@ -81,47 +79,62 @@
       });
     };
 
-    function parseSearchByKeyword(response){
-      var searchResults = response.data.query.search;
-      var titles = "";
-
-      // Processing the results.
+    /*  Parses an Array of search results and builds the 'articles' object.
+    *   returns the url request necessary to get additional info for each
+    *   of the pages.
+    */
+    function parseSearch(searchResults){
+      var titles = '';
       for (var i = 0; i < searchResults.length; i++) {
-        var article = {
+        $scope.articles.push({
           title: searchResults[i].title,
-          snippet: $sce.trustAsHtml(searchResults[i].snippet)
-        };
-        $scope.articles.push(article);
-
+          snippet: $sce.trustAsHtml(searchResults[i].snippet + ' (...)')
+        });
         titles += searchResults[i].title;
         if (i < searchResults.length - 1) {
           titles += "|";
         }
       }
-
       /* Building info query URL. This will provide us more
       * information about each article.
       */
-      var infoQuery = 'https://en.wikipedia.org/w/api.php?'
-        + 'action=query&prop=info&inprop=url&titles='
-        + titles
-        + '&format=json&callback=JSON_CALLBACK';
-      $scope.infoQuery = infoQuery;
-      return $http.jsonp(infoQuery);
+      var query = 'action=query&prop=info&inprop=url&titles=';
+      var parameters = '&format=json&callback=JSON_CALLBACK';
+      return ENDPOINT + query + titles + parameters;
     }
 
-    function parseInfo(response){
-      var infoResults = response.data.query.pages;
-      var ids = "";
-
-      for (article in infoResults) {
+    /*
+    *   Parses an Array of pages (obtained from querying Wikipedia for info)
+    *   and updates the 'articles' object with that data.
+    */
+    function parseInfo(pages) {
+      for (article in pages) {
         for (var j = 0; j < $scope.articles.length; j++) {
-          if (infoResults[article].title === $scope.articles[j].title) {
-            $scope.articles[j].url = infoResults[article].fullurl;
-            $scope.articles[j].pageid = infoResults[article].pageid;
+          if (pages[article].title === $scope.articles[j].title) {
+            $scope.articles[j].url = pages[article].fullurl;
+            $scope.articles[j].pageid = pages[article].pageid;
             break;
           }
         }
+      }
+    }
+
+    var Wikipedia = {
+      search: function(request) {
+        var deferred = $q.defer();
+        $http.jsonp(request).then(function(response) {
+          var results = response.data.query.search;
+          var infoURL = parseSearch(results);
+          deferred.resolve(infoURL);
+        });
+        return deferred.promise;
+      },
+      getInfo: function(request) {
+        var deferred = $q.defer();
+        $http.jsonp(request).then(function(response) {
+          deferred.resolve(response.data.query.pages);
+        });
+        return deferred.promise;
       }
     }
 
